@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Демо авторизации</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0f172a; color: #e2e8f0; margin: 0; padding: 24px; }
+    h1 { margin-top: 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; }
+    label { display: block; font-size: 14px; margin-bottom: 6px; color: #cbd5e1; }
+    input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid #1f2937; background: #0b1224; color: #e2e8f0; }
+    button { margin-top: 8px; padding: 10px 12px; border: none; border-radius: 10px; background: linear-gradient(135deg, #22c55e, #06b6d4); color: #0b1224; font-weight: 700; cursor: pointer; }
+    button.secondary { background: #1f2937; color: #e2e8f0; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    pre { background: #0b1224; border-radius: 10px; padding: 12px; overflow: auto; border: 1px solid #1f2937; }
+    .pill { display: inline-flex; align-items: center; gap: 6px; background: #1f2937; padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>Демо авторизации</h1>
+  <p>Работает с session куками или JWT (access + refresh). Все запросы идут на этот же хост.</p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Регистрация</h3>
+      <label>Имя пользователя</label>
+      <input id="reg-username" placeholder="alice">
+      <label>Пароль</label>
+      <input id="reg-password" type="password" placeholder="secret">
+      <button onclick="register()">Зарегистрироваться</button>
+    </div>
+
+    <div class="card">
+      <h3>Session (cookie)</h3>
+      <label>Имя пользователя</label>
+      <input id="session-username" placeholder="alice">
+      <label>Пароль</label>
+      <input id="session-password" type="password" placeholder="secret">
+      <div class="row">
+        <button onclick="loginSession()">Вход (session)</button>
+        <button class="secondary" onclick="meSession()">Профиль (session)</button>
+        <button class="secondary" onclick="logoutSession()">Выход (session)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>JWT</h3>
+      <label>Имя пользователя</label>
+      <input id="jwt-username" placeholder="alice">
+      <label>Пароль</label>
+      <input id="jwt-password" type="password" placeholder="secret">
+      <div class="row">
+        <button onclick="loginJwt()">Вход (JWT)</button>
+        <button class="secondary" onclick="meJwt()">Профиль (JWT)</button>
+        <button class="secondary" onclick="refreshTokens()">Обновить токены</button>
+      </div>
+    </div>
+  </div>
+
+  <h3>Лог</h3>
+  <pre id="log"></pre>
+
+  <script>
+    const logEl = document.getElementById("log");
+    let tokens = { access: null, refresh: null };
+
+    const show = (label, payload) => {
+      const time = new Date().toLocaleTimeString();
+      logEl.textContent = `[${time}] ${label}\n${JSON.stringify(payload, null, 2)}\n\n` + logEl.textContent;
+    };
+
+    const api = async (path, options = {}) => {
+      const resp = await fetch(path, {
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+        ...options,
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw { status: resp.status, data };
+      return data;
+    };
+
+    const register = async () => {
+      const name = document.getElementById("reg-username").value;
+      const password = document.getElementById("reg-password").value;
+      try {
+        const data = await api("/auth/register", { method: "POST", body: JSON.stringify({ name, password }) });
+        show("Registered", data);
+      } catch (err) {
+        show("Register failed", err);
+      }
+    };
+
+    const loginSession = async () => {
+      const name = document.getElementById("session-username").value;
+      const password = document.getElementById("session-password").value;
+      try {
+        const data = await api("/auth/login/session", { method: "POST", body: JSON.stringify({ name, password }) });
+        show("Session login ok", data);
+      } catch (err) {
+        show("Session login failed", err);
+      }
+    };
+
+    const meSession = async () => {
+      try {
+        const data = await api("/auth/me/session");
+        show("Session me", data);
+      } catch (err) {
+        show("Session me failed", err);
+      }
+    };
+
+    const logoutSession = async () => {
+      try {
+        const data = await api("/auth/logout/session", { method: "POST" });
+        show("Session logout", data);
+      } catch (err) {
+        show("Session logout failed", err);
+      }
+    };
+
+    const loginJwt = async () => {
+      const name = document.getElementById("jwt-username").value;
+      const password = document.getElementById("jwt-password").value;
+      try {
+        const data = await api("/auth/login/jwt", { method: "POST", body: JSON.stringify({ name, password }) });
+        tokens.access = data.access_token;
+        tokens.refresh = data.refresh_token;
+        show("JWT login ok", data);
+      } catch (err) {
+        show("JWT login failed", err);
+      }
+    };
+
+    const meJwt = async () => {
+      if (!tokens.access) return show("JWT me skipped", "no access token");
+      try {
+        const data = await api("/auth/me/jwt");
+        show("JWT me", data);
+      } catch (err) {
+        show("JWT me failed", err);
+      }
+    };
+
+    const refreshTokens = async () => {
+      if (!tokens.refresh) return show("Refresh skipped", "no refresh token");
+      try {
+        const data = await api("/auth/token/refresh", {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: tokens.refresh }),
+        });
+        tokens.access = data.access_token;
+        tokens.refresh = data.refresh_token;
+        show("Tokens refreshed", data);
+      } catch (err) {
+        show("Refresh failed", err);
+      }
+    };
+  </script>
+</body>
+</html>

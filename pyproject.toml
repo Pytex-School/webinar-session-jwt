@@ -1,0 +1,33 @@
+[project]
+name = "session-vs-jwt"
+version = "0.1.0"
+description = "Демо авторизации: session и JWT (access/refresh) на FastAPI и async SQLAlchemy."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.5",
+    "uvicorn[standard]>=0.30.6",
+    "sqlalchemy[asyncio]>=2.0.31",
+    "asyncpg>=0.29.0",
+    "pydantic-settings>=2.3.4",
+    "bcrypt>=4.1.2",
+    "pyjwt>=2.9.0",
+    "python-multipart>=0.0.12",
+]
+
+[build-system]
+requires = ["setuptools>=68.0.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+auth_app = ["static/*"]
+
+[tool.uv]
+dev-dependencies = []
